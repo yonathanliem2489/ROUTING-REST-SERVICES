@@ -29,24 +29,7 @@ public class RoutingRestConfiguration extends BaseRestEndpoint {
   @Bean
   RouterFunction<ServerResponse> routingRestEndpoints(RoutingRestProperties routingRestProperties,
       SmartValidator objectValidator) {
-    RouterFunctions.Builder routerFunctionBuilder = route();
-    routingRestProperties.getRestEndpoints().forEach(restEndpoint -> {
-      BaseService handlerInstance = handleInstance(restEndpoint.getServiceClass(), context, BaseService.class);
-      BaseRequest baseRequest = resolveBaseRequest(restEndpoint.getRequestClass(), BaseRequest.class);
-      RequestPredicate requestPredicate = resolvePredicate(restEndpoint);
-      final RouterFunction<ServerResponse>[] routerFunction = new RouterFunction[]{
-          route(requestPredicate, request ->
-              resolveHandler(handlerInstance, baseRequest.getClass(), request, restEndpoint.getPath(), objectValidator))};
-      if(Objects.nonNull(restEndpoint.getFilterClasses())) {
-        restEndpoint.getFilterClasses().forEach(filter ->
-            routerFunction[0] = routerFunction[0].filter(handleInstance(filter, context, BaseFilter.class))
-        );
-      }
-
-      routerFunctionBuilder.add(routerFunction[0]);
-    });
-
-    return routerFunctionBuilder.build();
+    return buildRouter(context, routingRestProperties, objectValidator);
   }
 
 }

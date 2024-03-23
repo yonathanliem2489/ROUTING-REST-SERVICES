@@ -9,9 +9,73 @@ Current conditions, when we start a new project. to create a new endpoint, we ha
 ### What is served?
 We try to support starting from unit tests, error handling and also documentation of this improvement, and this feature already supports it
 
-### What configuration should be set?
-added in properties
+### Installation
+#### Create Route Configuration
+```java
+@Slf4j
+@Configuration
+public class RoutingRestConfiguration extends BaseRestEndpoint {
+
+  @Autowired
+  private ApplicationContext context;
+
+  @Bean
+  RouterFunction<ServerResponse> routingRestEndpoints(RoutingRestProperties routingRestProperties,
+      SmartValidator objectValidator) {
+    return buildRouter(context, routingRestProperties, objectValidator);
+  }
+
+}
 ```
+
+#### Create Open Api Configuration
+```java
+
+@Slf4j
+@Configuration
+public class OpenApiConfiguration extends OpenApiBaseConfiguration {
+
+  private static final String HEADER = "header";
+
+  @Autowired
+  private RoutingRestProperties routingRestProperties;
+
+  @Bean
+  public OpenApiCustomizer openApiCustomizer() {
+      return getOpenApiCustom(routingRestProperties,
+          buildHeaderParameters(), buildApiResponses());
+  }
+
+  private List<Parameter> buildHeaderParameters() {
+    return List.of(
+        new Parameter().name("example").in(HEADER)
+          .schema(new StringSchema().example("example"))
+          .required(true)
+          .description("example mandatory header")
+    );
+  }
+
+  private ApiResponses buildApiResponses() {
+    ApiResponses apiResponses = new ApiResponses();
+    apiResponses.addApiResponse(
+        String.valueOf(HttpStatus.OK.value()),
+        new ApiResponse().description("successful operation"));
+    apiResponses.addApiResponse(
+        String.valueOf(HttpStatus.BAD_REQUEST.value()),
+        new ApiResponse().description("Bad request"));
+    apiResponses.addApiResponse(
+        String.valueOf(HttpStatus.UNAUTHORIZED.value()),
+        new ApiResponse().description("Not authorized"));
+    return apiResponses;
+  }
+}
+```
+
+#### Added in properties
+```
+# springdoc config
+springdoc.swagger-ui.path=/v3/api-docs
+
 routing.rest.restEndpoints[0].httpMethod=POST
 routing.rest.restEndpoints[0].path=/routing-demo/test-post
 routing.rest.restEndpoints[0].serviceClass=com.simultan.team.routing.services.CreateProfileService

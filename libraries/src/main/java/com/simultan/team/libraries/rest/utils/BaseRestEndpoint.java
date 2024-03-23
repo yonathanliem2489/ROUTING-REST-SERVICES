@@ -1,12 +1,14 @@
 package com.simultan.team.libraries.rest.utils;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.accept;
+import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 import static org.springframework.web.reactive.function.server.ServerResponse.status;
 
 import com.simultan.team.libraries.model.BaseService;
 import com.simultan.team.libraries.model.rest.BaseRequest;
 import com.simultan.team.libraries.model.rest.BlankRequest;
 import com.simultan.team.libraries.model.rest.ServiceResponse;
+import com.simultan.team.libraries.model.rest.filter.BaseFilter;
 import com.simultan.team.libraries.rest.properties.RoutingRestProperties;
 import com.simultan.team.libraries.rest.properties.RoutingRestProperties.RestEndpoint;
 import java.lang.reflect.Constructor;
@@ -31,6 +33,8 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.SmartValidator;
 import org.springframework.web.reactive.function.server.RequestPredicate;
 import org.springframework.web.reactive.function.server.RequestPredicates;
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
@@ -39,8 +43,31 @@ import reactor.core.publisher.Mono;
 @EnableConfigurationProperties(RoutingRestProperties.class)
 public abstract class BaseRestEndpoint {
 
+  protected RouterFunction<ServerResponse> buildRouter(ApplicationContext context,
+      RoutingRestProperties routingRestProperties,
+      SmartValidator objectValidator) {
+    RouterFunctions.Builder routerFunctionBuilder = route();
+    routingRestProperties.getRestEndpoints().forEach(restEndpoint -> {
+      BaseService handlerInstance = handleInstance(restEndpoint.getServiceClass(), context, BaseService.class);
+      BaseRequest baseRequest = resolveBaseRequest(restEndpoint.getRequestClass(), BaseRequest.class);
+      RequestPredicate requestPredicate = resolvePredicate(restEndpoint);
+      final RouterFunction<ServerResponse>[] routerFunction = new RouterFunction[]{
+          route(requestPredicate, request ->
+              resolveHandler(handlerInstance, baseRequest.getClass(), request, restEndpoint.getPath(), objectValidator))};
+      if(Objects.nonNull(restEndpoint.getFilterClasses())) {
+        restEndpoint.getFilterClasses().forEach(filter ->
+            routerFunction[0] = routerFunction[0].filter(handleInstance(filter, context, BaseFilter.class))
+        );
+      }
 
-  protected RequestPredicate resolvePredicate(RestEndpoint restEndpoint) {
+      routerFunctionBuilder.add(routerFunction[0]);
+    });
+
+    return routerFunctionBuilder.build();
+  }
+
+
+  private RequestPredicate resolvePredicate(RestEndpoint restEndpoint) {
 
     RequestPredicate requestPredicate = RequestPredicates.method(restEndpoint.getHttpMethod())
         .and(RequestPredicates.path(restEndpoint.getPath()));
@@ -74,7 +101,7 @@ public abstract class BaseRestEndpoint {
     return requestPredicate;
   }
 
-  protected  <T> T handleInstance(String packageClass, ApplicationContext context, Class<T> tClass) {
+  private  <T> T handleInstance(String packageClass, ApplicationContext context, Class<T> tClass) {
     Class<?> handlerClass;
     try {
       handlerClass = Class.forName(packageClass);
@@ -85,7 +112,7 @@ public abstract class BaseRestEndpoint {
     return  tClass.cast(context.getBean(handlerClass));
   }
 
-  protected  <T> T resolveBaseRequest(String packageClass, Class<T> tClass) {
+  private  <T> T resolveBaseRequest(String packageClass, Class<T> tClass) {
     if(Objects.nonNull(packageClass)) {
       T handlerRequest;
       try {
@@ -104,7 +131,7 @@ public abstract class BaseRestEndpoint {
     return tClass.cast(new BlankRequest());
   }
 
-  protected Mono<ServerResponse> resolveHandler(BaseService baseService, Class<? extends BaseRequest> baseRequestClass,
+  private Mono<ServerResponse> resolveHandler(BaseService baseService, Class<? extends BaseRequest> baseRequestClass,
       ServerRequest serverRequest, String path, SmartValidator objectValidator) {
     Map<String, Object> headers = mapHeadersToHashMap(serverRequest);
     Map<String, Object> params = mapParamsToHashMap(serverRequest);
@@ -168,7 +195,7 @@ public abstract class BaseRestEndpoint {
             entry -> entry.getValue().size() > 1 ? entry.getValue() : entry.getValue().get(0)));
   }
 
-  public static Map<String, Object> mapHeadersToHashMap(ServerRequest serverRequest) {
+  private Map<String, Object> mapHeadersToHashMap(ServerRequest serverRequest) {
     HttpHeaders httpHeaders = serverRequest.headers().asHttpHeaders();
     Map<String, Object> headerMap = new HashMap<>();
     httpHeaders.forEach((key, values) -> {
