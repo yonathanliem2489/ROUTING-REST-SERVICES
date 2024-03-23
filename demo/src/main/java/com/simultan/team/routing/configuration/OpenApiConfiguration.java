@@ -1,5 +1,6 @@
 package com.simultan.team.routing.configuration;
 
+import com.simultan.team.libraries.model.OpenApiBaseConfiguration;
 import com.simultan.team.libraries.rest.properties.RoutingRestProperties;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.media.StringSchema;
@@ -17,7 +18,7 @@ import org.springframework.http.HttpStatus;
 
 @Slf4j
 @Configuration
-public class SwaggerConfiguration {
+public class OpenApiConfiguration extends OpenApiBaseConfiguration {
 
   private static final String HEADER = "header";
 
@@ -25,26 +26,9 @@ public class SwaggerConfiguration {
   private RoutingRestProperties routingRestProperties;
 
   @Bean
-  public OpenApiCustomizer getOpenApiCustom() {
-      return openAPI -> {
-      Paths paths = new Paths();
-      routingRestProperties.getRestEndpoints()
-          .stream().filter(restEndpoint -> Objects.nonNull(restEndpoint.getPathDocumentations()))
-          .forEach(restEndpoint -> restEndpoint.getPathDocumentations().forEach((key, pathItem) -> {
-            pathItem.readOperations().forEach(operation -> {
-              if(Objects.nonNull(operation.getParameters())) {
-                List<Parameter> parameters = new java.util.ArrayList<>(operation.getParameters());
-                parameters.addAll(buildHeaderParameters());
-                operation.setParameters(parameters);
-              }
-
-              operation.setResponses(buildApiResponses());
-            });
-
-            paths.addPathItem(key, pathItem);
-          }));
-      openAPI.paths(paths);
-    };
+  public OpenApiCustomizer openApiCustomizer() {
+      return getOpenApiCustom(routingRestProperties,
+          buildHeaderParameters(), buildApiResponses());
   }
 
   private List<Parameter> buildHeaderParameters() {
