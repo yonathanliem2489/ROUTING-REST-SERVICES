@@ -190,7 +190,7 @@ public class MapProblemTests extends MapProblemUtils {
         + "  \"price\": \"inventories.$.price.finalPrice\",\n"
         + "  \"facilityIds\": \"inventories.$.facilities.$.id\",\n"
         + "  \"currency\": \"currency\",\n"
-        + "  \"priceText\": \"currency\\\" \\\"inventories.$.price.finalPrice\"\n"
+        + "  \"priceText\": \"currency\\\" \\\"inventories.$.price.finalPrice\"\n" // level 3
         + "}\n";
 
     String outputString = "[\n"
@@ -285,9 +285,9 @@ public class MapProblemTests extends MapProblemUtils {
 
     Map<String, String> mappingSpecs = new HashMap<>();
     mappingSpecs.put("inventoryId", "inventories.$.id");
-    mappingSpecs.put("price", "inventories.$.price.finalPrice");
-    mappingSpecs.put("facilityIds", "inventories.$.facilities.$.id");
-    mappingSpecs.put("currency", "currency");
+//    mappingSpecs.put("price", "inventories.$.price.finalPrice");
+//    mappingSpecs.put("facilityIds", "inventories.$.facilities.$.id");
+//    mappingSpecs.put("currency", "currency");
 //    mappingSpecs.put("priceText", "\"awal \""
 //        + "__IF__[inventories.$.availableQuota]__EQ__[\"0\"]"
 //        + "__THEN__[\"Sold out\"]"
@@ -298,8 +298,8 @@ public class MapProblemTests extends MapProblemUtils {
 //        + "__ELSE__[currency\" \"inventories.$.price.finalPrice]__END__\""
 //        + "\" akhir\"");
 
-    mappingSpecs.put("priceText", "__IF__[inventories.$.availableQuota]__EQ__[\"0\"]"
-        + "__THEN__[\"Sold out\"]__ELSE__[currency\" \"inventories.$.price.finalPrice]__END__");
+//    mappingSpecs.put("priceText", "__IF__[inventories.$.availableQuota]__EQ__[\"0\"]"
+//        + "__THEN__[\"Sold out\"]__ELSE__[currency\" \"inventories.$.price.finalPrice]__END__");
 
     mappingSpecs.put("tripDurationText", "__IF__[inventories.$.name]"
         + "__CONTAINS__[\"Express\"]__THEN__[\"30 minutes\"]"
@@ -309,8 +309,120 @@ public class MapProblemTests extends MapProblemUtils {
     // Call the method under test
     List<Map<String, Object>> output = transformDataWithNestedKey(inputData, mappingSpecs, nestedKey);
     List<Map<String, Object>> expectedOutput = mapper.readValue(outputString, new TypeReference<List<Map<String, Object>>>() {});
-    Assertions.assertEquals(expectedOutput.toString(), output.toString());
+    Assertions.assertEquals(expectedOutput, output);
   }
 
+  @Test
+  void levelFive() throws JsonProcessingException {
+    String jsonString = "{\n"
+        + "  \"inventories\": [\n"
+        + "    {\n"
+        + "      \"id\": \"1\",\n"
+        + "      \"name\": \"Regular\",\n"
+        + "      \"price\": {\n"
+        + "          \"finalPrice\": 62000\n"
+        + "      },\n"
+        + "      \"facilities\": [\n"
+        + "        {\n"
+        + "          \"name\": \"Full AC\",\n"
+        + "          \"id\": \"ac\"\n"
+        + "        }\n"
+        + "      ],\n"
+        + "      \"availableQuota\": 10\n"
+        + "    },\n"
+        + "    {\n"
+        + "      \"id\": \"2\",\n"
+        + "      \"name\": \"Express\",\n"
+        + "      \"price\": {\n"
+        + "          \"finalPrice\": 80000\n"
+        + "      },\n"
+        + "      \"facilities\": [\n"
+        + "        {\n"
+        + "          \"name\": \"Full AC\",\n"
+        + "          \"id\": \"ac\"\n"
+        + "        },\n"
+        + "        {\n"
+        + "          \"name\": \"VIP Lounge\",\n"
+        + "          \"id\": \"vip-lounge\"\n"
+        + "        }\n"
+        + "      ],\n"
+        + "      \"availableQuota\": 0\n"
+        + "    }\n"
+        + "  ],\n"
+        + "  \"currency\": \"IDR\"\n"
+        + "}\n";
+
+    String outputString = "[\n"
+        + "  {\n"
+        + "    \"inventoryId\": 1,\n"
+        + "    \"price\": 62000,\n"
+        + "    \"facilityIds\": [\"ac\"],\n"
+        + "    \"currency\": \"IDR\",\n"
+        + "    \"priceText\": \"IDR 62000\",\n"
+        + "    \"tripDuration\": {\n"
+        + "      \"text\": \"2 hours\",\n"
+        + "      \"valueInMinutes\": \"120\"\n"
+        + "    },\n"
+        + "    \"facilities\": [\n"
+        + "      {\n"
+        + "        \"id\": \"ac\",\n"
+        + "        \"name\": \"Full AC\"\n"
+        + "      }\n"
+        + "    ]\n"
+        + "  },\n"
+        + "  {\n"
+        + "    \"inventoryId\": 2,\n"
+        + "    \"price\": 80000,\n"
+        + "    \"facilityIds\": [\"ac\", \"vip-lounge\"],\n"
+        + "    \"currency\": \"IDR\",\n"
+        + "    \"priceText\": \"Sold out\",\n"
+        + "    \"tripDuration\": {\n"
+        + "      \"text\": \"30 minutes\",\n"
+        + "      \"valueInMinutes\": \"30\"\n"
+        + "    },\n"
+        + "    \"facilities\": [\n"
+        + "      {\n"
+        + "        \"id\": \"ac\",\n"
+        + "        \"name\": \"Full AC\"\n"
+        + "      },\n"
+        + "      {\n"
+        + "        \"id\": \"vip-lounge\",\n"
+        + "        \"name\": \"VIP lounge\"\n"
+        + "      }\n"
+        + "    ]\n"
+        + "  }\n"
+        + "]\n";
+
+    Map<String, Object> inputData =
+        mapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
+
+    Map<String, String> mappingSpecs = new HashMap<>();
+//    mappingSpecs.put("inventoryId", "inventories.$.id");
+//    mappingSpecs.put("price", "inventories.$.price.finalPrice");
+//    mappingSpecs.put("facilityIds", "inventories.$.facilities.$.id");
+//    mappingSpecs.put("currency", "currency");
+//
+//    mappingSpecs.put("priceText", "__IF__[inventories.$.availableQuota]__EQ__[\"0\"]"
+//        + "__THEN__[\"Sold out\"]__ELSE__[currency\" \"inventories.$.price.finalPrice]__END__");
+//
+//    mappingSpecs.put("tripDuration.text.aja", "__IF__[inventories.$.name]"
+//        + "__CONTAINS__[\"Express\"]__THEN__[\"30 minutes\"]"
+//        + "__ELSE__[\"2 hours\"]__END__");
+//    mappingSpecs.put("tripDuration.valueInMinutes", "__IF__[inventories.$.name]"
+//        + "__CONTAINS__[\"Express\"]__THEN__[\"30\"]"
+//        + "__ELSE__[\"120\"]__END__");
+
+    mappingSpecs.put("facilities.$.id", "inventories.$.facilities.$.id");
+//    mappingSpecs.put("facilities.$.name", "inventories.$.facilities.$.name");
+
+
+
+    String nestedKey = "inventories";
+
+    // Call the method under test
+    List<Map<String, Object>> output = transformDataWithNestedKey(inputData, mappingSpecs, nestedKey);
+    List<Map<String, Object>> expectedOutput = mapper.readValue(outputString, new TypeReference<List<Map<String, Object>>>() {});
+    Assertions.assertEquals(expectedOutput.toString(), output.toString());
+  }
 
 }

@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 public class MapProblemUtils {
@@ -57,14 +58,17 @@ public class MapProblemUtils {
 
     List<Map<String, Object>> data = new ArrayList<>();
     masterArrayData.forEach(masterData -> {
+      // parent field level
       Map<String, Object> mapping = new HashMap<>();
       mappingSpec.forEach((attributeName, code) -> {
-          mapping.put(attributeName, extractVariable(code, nestedKey, masterData, inputData));
+        mapping.put(attributeName, extractVariable(code, nestedKey, masterData, inputData));
       });
+
+      // add by data master array
       data.add(mapping);
     });
 
-    return data;
+    return remapNestedFieldResponse(data);
   }
 
   public List<Map<String, Object>> transformData(List<Map<String, Object>> inputData,
@@ -81,6 +85,62 @@ public class MapProblemUtils {
     return dataMapping;
   }
 
+
+  private List<Map<String, Object>> remapNestedFieldResponse(List<Map<String, Object>> data) {
+    return data.stream()
+        .map(map -> {
+          Map<String, Object> remap = new HashMap<>();
+          map.forEach((key, value) -> {
+            if(key.contains("$") || key.contains(".")) {
+              remap.put(key, remapNestedDetails(remap, key, value));
+            } else {
+              remap.put(key, value);
+            }
+          });
+          return remap;
+        })
+        .collect(Collectors.toList());
+  }
+
+  private Map<String, Object> remapNestedDetails(Map<String, Object> remap, String key, Object value) {
+    if(key.contains("$")) {
+      String[] keys = key.split("\\.\\$\\.");
+      Map<String, Object> nested = remap;
+
+      if(!remap.containsKey(keys[0])) {
+        List<Object> nestedObjects = new ArrayList<>();
+        List<Map<String, Object>> maps =  (List<Map<String, Object>>) remap.get(keys[0]);
+        for (Map<String, Object> map : maps) {
+          nestedObjects.add(remapNestedDetails(map, keys[1], value));
+        }
+        remap.put(keys[0], remapNestedDetails(nested, keys[1], nestedObjects));
+      }
+
+      for (int i = 0; i < keys.length - 1; i++) {
+        if(!nested.containsKey(keys[i])) {
+          nested.put(keys[i], new HashMap<String, Object>());
+        }
+        nested = (Map<String, Object>) nested.get(keys[i]);
+      }
+      nested.put(keys[keys.length - 1], value);
+    }
+    else if(key.contains(".")) {
+      String[] keys = key.split("\\.");
+      Map<String, Object> nested = remap;
+      for (int i = 0; i < keys.length - 1; i++) {
+        if(!nested.containsKey(keys[i])) {
+          nested.put(keys[i], new HashMap<String, Object>());
+        }
+        nested = (Map<String, Object>) nested.get(keys[i]);
+      }
+      nested.put(keys[keys.length - 1], value);
+    } else {
+      remap.put(key, value);
+    }
+
+    return remap;
+  }
+
   private Object generateData(String nestedKey, Map<String, Object> inputData, Map<String, Object> data, String code) {
 
     // if it's statement
@@ -93,7 +153,9 @@ public class MapProblemUtils {
       String[] codeParts = code.split("\\.\\$\\.", 2);
       List<Map<String, Object>> maps = (List<Map<String, Object>>) data.get(codeParts[0]);
       List<Object> arrayData = new ArrayList<>();
-      maps.forEach(map -> arrayData.add(generateData(nestedKey, inputData, map, codeParts[1])));
+
+      maps.forEach(map ->
+          arrayData.add(generateData(nestedKey, inputData, map, codeParts[1])));
       return arrayData;
     }
 
