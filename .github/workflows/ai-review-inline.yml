@@ -12,12 +12,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # ambil semua riwayat commit untuk diff
 
     - name: Get PR diff with line numbers
       run: |
-        git fetch origin ${{ github.base_ref }}
-        git diff --unified=0 origin/${{ github.base_ref }}...HEAD > pr_diff.txt
+        git fetch origin ${{ github.base_ref }} ${{ github.head_ref }}
+        git diff --unified=0 origin/${{ github.base_ref }}...origin/${{ github.head_ref }} > pr_diff.txt
         echo "=== DIFF ==="
         cat pr_diff.txt
 
@@ -32,17 +32,18 @@ jobs:
 
     - name: Run AI review with JSON output
       run: |
-        DIFF_CONTENT=$(cat pr_diff.txt | head -c 4000)
+        DIFF_CONTENT=$(head -c 4000 pr_diff.txt)
         PROMPT="You are a senior software engineer reviewing a GitHub Pull Request.
         Output must be in JSON array format ONLY, like this:
         [{\"file\":\"src/main/java/App.java\",\"line\":10,\"comment\":\"Consider using try-with-resources for better resource management.\"}]
         Do not include anything else besides valid JSON.
         Review this diff:\n\n$DIFF_CONTENT"
 
-                ollama run codellama:7b "$PROMPT" > raw_review.txt
-                cat raw_review.txt | jq . > review.json || echo "[]">review.json
-                echo "=== AI INLINE REVIEW JSON ==="
-                cat review.json
+        ollama run codellama:7b "$PROMPT" > raw_review.txt
+        # Pastikan output JSON valid, kalau gagal bikin array kosong
+        cat raw_review.txt | jq . > review.json || echo "[]" > review.json
+        echo "=== AI INLINE REVIEW JSON ==="
+        cat review.json
 
     - name: Post inline comments to PR
       uses: actions/github-script@v7
