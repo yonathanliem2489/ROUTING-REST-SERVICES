@@ -1,4 +1,4 @@
-name: AI Code Review Inline (Ollama)
+name: AI Code Review Inline (Ollama with Cache)
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # ambil semua riwayat commit untuk diff
+        fetch-depth: 0  # ambil semua commit untuk diff
 
     - name: Get PR diff with line numbers
       run: |
@@ -21,14 +21,24 @@ jobs:
         echo "=== DIFF ==="
         cat pr_diff.txt
 
+    - name: Cache Ollama models
+      uses: actions/cache@v4
+      with:
+        path: ~/.ollama
+        key: ollama-model-codellama-7b
+
     - name: Install Ollama
       run: |
         curl -fsSL https://ollama.com/install.sh | sh
         ollama serve & sleep 5
 
-    - name: Pull LLM model
+    - name: Pull LLM model (only if not cached)
       run: |
-        ollama pull codellama:7b
+        if [ ! -f ~/.ollama/models/manifests/registry.ollama.ai/library/codellama:7b ]; then
+          ollama pull codellama:7b
+        else
+          echo "Model codellama:7b sudah ada di cache"
+        fi
 
     - name: Run AI review with JSON output
       run: |
@@ -38,6 +48,31 @@ jobs:
         [{\"file\":\"src/main/java/App.java\",\"line\":10,\"comment\":\"Consider using try-with-resources for better resource management.\"}]
         Do not include anything else besides valid JSON.
         Review this diff:\n\n$DIFF_CONTENT"
+
+
+        PROMPT="You are an expert code reviewer specializing in memory leak detection. Analyze the provided code changes for potential memory leaks.
+        Focus on these patterns:
+        **Java:**
+        - Unclosed resources (streams, connections, readers/writers)
+        - Static collections that grow indefinitely
+        - Event listeners not removed
+        - Thread pools not shut down
+        - Circular references
+        - Large object retention
+
+        **Go:**
+        - Goroutine leaks (infinite loops, blocked channels)
+        - Unclosed channels
+        - Defer statements missing
+        - Circular references in structs
+        - Large slice/map retention
+
+        Provide specific line numbers and actionable suggestions.
+        Output must be in JSON array format ONLY, like this:
+        [{\"file\":\"src/main/java/App.java\",\"line\":10,\"comment\":\"Consider using try-with-resources for better resource management.\"}]
+        Do not include anything else besides valid JSON.
+        Review this diff:\n\n$DIFF_CONTENT"
+
 
         ollama run codellama:7b "$PROMPT" > raw_review.txt
         # Pastikan output JSON valid, kalau gagal bikin array kosong
