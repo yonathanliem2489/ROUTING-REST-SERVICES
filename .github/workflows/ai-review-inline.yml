@@ -43,13 +43,7 @@ jobs:
     - name: Run AI review with JSON output
       run: |
         DIFF_CONTENT=$(head -c 4000 pr_diff.txt)
-        PROMPT="You are a senior software engineer reviewing a GitHub Pull Request.
-        Output must be in JSON array format ONLY, like this:
-        [{\"file\":\"src/main/java/App.java\",\"line\":10,\"comment\":\"Consider using try-with-resources for better resource management.\"}]
-        Do not include anything else besides valid JSON.
-        Review this diff:\n\n$DIFF_CONTENT"
-
-
+        
         PROMPT="You are an expert code reviewer specializing in memory leak detection. Analyze the provided code changes for potential memory leaks.
         Focus on these patterns:
         **Java:**
